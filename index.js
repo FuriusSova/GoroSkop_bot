@@ -28,20 +28,25 @@ let userSign;
 //Repeated prediction
 
 const resetAtMidnight = async (ctx) => {
-    let now = new Date();
-    let nextDay = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate() + 1, // the next day, ...
-        choosenTime[0], choosenTime[1], 0, 0 // ...at 12:00:00 hours
-    );
-    let msToMidnight = nextDay.getTime() - now.getTime();
+    try {
+        let now = new Date();
+        let nextDay = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate() + 1, // the next day, ...
+            choosenTime[0], choosenTime[1], 0, 0 // ...at 12:00:00 hours
+        );
+        let msToMidnight = nextDay.getTime() - now.getTime();
 
-    repeatedPrediction = setTimeout(async function() {
-        await startEveryDayPred(userSign, ctx);              //      <-- This is the function being called at midnight.
-        await resetAtMidnight(ctx);    //      Then, reset again next midnight.
-    }, 15000);
-}
+        repeatedPrediction = setTimeout(async function() {
+            await startEveryDayPred(userSign, ctx);              //      <-- This is the function being called at midnight.
+            await resetAtMidnight(ctx);    //      Then, reset again next midnight.
+        }, msToMidnight);
+    } 
+    catch (e) {
+        console.log(e);
+    };
+};
 
 const startEveryDayPred = async (name, ctx) => {
     $ = await getHTML("https://orakul.com/");
