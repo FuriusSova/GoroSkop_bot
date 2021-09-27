@@ -6,7 +6,8 @@ const vars = require("./variables");
 
 const utils = require("util")
 const { default: axios } = require("axios");
-const chr = require("cheerio")
+const chr = require("cheerio");
+const { DESTRUCTION } = require('dns');
 
 //Local variables
 
@@ -32,14 +33,14 @@ const resetAtMidnight = async (ctx) => {
         now.getFullYear(),
         now.getMonth(),
         now.getDate() + 1, // the next day, ...
-        choosenTime[0], choosenTime[1], 0 // ...at 12:00:00 hours
+        choosenTime[0], choosenTime[1], 0, 0 // ...at 12:00:00 hours
     );
     let msToMidnight = nextDay.getTime() - now.getTime();
 
     repeatedPrediction = setTimeout(async function() {
         await startEveryDayPred(userSign, ctx);              //      <-- This is the function being called at midnight.
         await resetAtMidnight(ctx);    //      Then, reset again next midnight.
-    }, msToMidnight);
+    }, 15000);
 }
 
 const startEveryDayPred = async (name, ctx) => {
