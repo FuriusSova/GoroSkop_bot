@@ -36,12 +36,25 @@ const resetAtMidnight = async (ctx) => {
             now.getDate() + 1, // the next day, ...
             choosenTime[0], choosenTime[1], 0, 0 // ...at 12:00:00 hours
         );
+        
+        /*-----------------
+        
+        let nextDay1 = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate(), // the next day, ...
+            20, 0, 0, 0 // ...at 12:00:00 hours
+        );
+        let msNow1 = nextDay1.getTime() - now.getTime();
+        
+        */
+        
         let msToMidnight = nextDay.getTime() - now.getTime();
 
         repeatedPrediction = setTimeout(async function() {
             await startEveryDayPred(userSign, ctx);              //      <-- This is the function being called at midnight.
             await resetAtMidnight(ctx);    //      Then, reset again next midnight.
-        }, msToMidnight);
+        }, msNow1);
     } 
     catch (e) {
         console.log(e);
