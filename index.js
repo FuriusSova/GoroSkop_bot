@@ -37,7 +37,7 @@ const resetAtMidnight = async (ctx) => {
             choosenTime[0], choosenTime[1], 0, 0 // ...at 12:00:00 hours
         );
         
-        /*-----------------
+        /*-----------------*/
         
         let nextDay1 = new Date(
             now.getFullYear(),
@@ -47,7 +47,7 @@ const resetAtMidnight = async (ctx) => {
         );
         let msNow1 = nextDay1.getTime() - now.getTime();
         
-        */
+        /*---------------------*/
         
         let msToMidnight = nextDay.getTime() - now.getTime();
 
