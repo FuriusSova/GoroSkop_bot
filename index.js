@@ -38,7 +38,7 @@ const scheduledPrediction = async (ctx) => {
             timezone: "Europe/Kiev"
         });
 
-        /*
+        /* 
         let now = new Date();
         let nextDay = new Date(
             now.getFullYear(),
@@ -52,7 +52,8 @@ const scheduledPrediction = async (ctx) => {
         repeatedPrediction = setTimeout(async function() {
             await startEveryDayPred(userSign, ctx);
             await resetAtMidnight(ctx);
-        }, msToMidnight);*/
+        }, msToMidnight);
+        */
     } 
     catch (e) {
         console.log(e);
