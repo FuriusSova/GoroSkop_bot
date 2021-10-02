@@ -8,6 +8,7 @@ const utils = require("util")
 const { default: axios } = require("axios");
 const chr = require("cheerio");
 const { DESTRUCTION } = require('dns');
+const cron = require("node-cron");
 
 //Local variables
 
@@ -16,7 +17,7 @@ let $;
 let zodInd;
 let isChoosen = false;
 let choosenTime;
-let repeatedPrediction;
+let scheduleTask;
 
 //User variables
 
@@ -27,8 +28,17 @@ let userSign;
 
 //Repeated prediction
 
-const resetAtMidnight = async (ctx) => {
+const scheduledPrediction = async (ctx) => {
     try {
+        scheduleTask = cron.schedule(`${choosenTime[1]} ${choosenTime[0]} * * *`, async () => {
+            await startEveryDayPred(userSign, ctx);
+            await scheduledPrediction(ctx);
+        }, {
+            scheduled: true,
+            timezone: "Europe/Kiev"
+        });
+
+        /*
         let now = new Date();
         let nextDay = new Date(
             now.getFullYear(),
@@ -36,12 +46,13 @@ const resetAtMidnight = async (ctx) => {
             now.getDate() + 1, // the next day, ...
             choosenTime[0], choosenTime[1], 0, 0 // ...at 12:00:00 hours
         );
+        
         let msToMidnight = nextDay.getTime() - now.getTime();
 
         repeatedPrediction = setTimeout(async function() {
-            await startEveryDayPred(userSign, ctx);              //      <-- This is the function being called at midnight.
-            await resetAtMidnight(ctx);    //      Then, reset again next midnight.
-        }, msToMidnight);
+            await startEveryDayPred(userSign, ctx);
+            await resetAtMidnight(ctx);
+        }, msToMidnight);*/
     } 
     catch (e) {
         console.log(e);
@@ -61,7 +72,6 @@ const startEveryDayPred = async (name, ctx) => {
 
 const replyFunction = async (ctx, name) => {
     await ctx.replyWithHTML(`<em>Прогноз на сегодня для: <b>${name}</b></em> - ${prediction.trim()}`);
-    await ctx.reply(utils.format(vars.textForNextPred, choosenTime[0], choosenTime[2]));
 };
 
 //Repeated prediction
@@ -72,8 +82,8 @@ const setSign = async (ctx) => {
             if(user_zod == `zod_repeated_${i}`) {
                 userSign = vars.zodiaks[i];
                 await ctx.replyWithHTML(`Ваш знак зодиака : <b>${vars.zodiaks[i]}</b>`)
-                await parse(userSign, ctx, "time_tod", utils.format(vars.textForNextPred, choosenTime[0], choosenTime[2]));
-                await resetAtMidnight(ctx)
+                await ctx.reply(utils.format(vars.textForNextPred, choosenTime[0], choosenTime[2]));
+                await scheduledPrediction(ctx);
             }
         }
     } else if(user_zod.includes("choose")){
@@ -161,8 +171,8 @@ const reactOnMessage = async (ctx) => {
                         ]
                     ))
                 } else {
-                    await parse(userSign, ctx, "time_tod", utils.format(vars.textForNextPred, choosenTime[0], choosenTime[2]));
-                    await resetAtMidnight(ctx);
+                    await ctx.reply(utils.format(vars.textForNextPred, choosenTime[0], choosenTime[2]));
+                    await scheduledPrediction(ctx);
                 }
             } else {
                 await ctx.reply("Неверный формат времени!");
@@ -369,7 +379,7 @@ bot.action("zod_change", async ctx => {
 
 bot.action("butt_cancell", async ctx => {
     choosenTime = "";
-    clearTimeout(repeatedPrediction);
+    scheduleTask.stop();
     await ctx.editMessageText("Ежедневный прогноз был отменён, чтобы снова его запустить, выберите соответствующий пункт меню.", ctx.callbackQuery.message.message_id);
 })
 
