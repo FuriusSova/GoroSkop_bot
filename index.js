@@ -33,15 +33,7 @@ const scheduledPrediction = async (ctx) => {
         if (scheduleTask) {
             scheduleTask.start();
         } else {
-            /*
             scheduleTask = cron.schedule(`${choosenTime[1]} ${choosenTime[0]} * * *`, async () => {
-                await startEveryDayPred(userSign, ctx);
-            }, {
-                scheduled: true,
-                timezone: "Europe/Kiev"
-            });
-            */
-            scheduleTask = cron.schedule(`* * * * *`, async () => {
                 await startEveryDayPred(userSign, ctx);
             }, {
                 scheduled: true,
