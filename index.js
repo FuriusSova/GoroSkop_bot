@@ -30,16 +30,13 @@ let userSign;
 
 const scheduledPrediction = async (ctx) => {
     try {
-        if (scheduleTask) {
-            scheduleTask.start();
-        } else {
-            scheduleTask = cron.schedule(`${choosenTime[1]} ${choosenTime[0]} * * *`, async () => {
-                await startEveryDayPred(userSign, ctx);
-            }, {
-                scheduled: true,
-                timezone: "Europe/Kiev"
-            });
-        };
+        scheduleTask = cron.schedule(`${choosenTime[1]} ${choosenTime[0]} * * *`, async () => {
+            await startEveryDayPred(userSign, ctx);
+        }, {
+            scheduled: true,
+            timezone: "Europe/Kiev"
+        });
+        console.log(scheduleTask);
 
         /* 
         let now = new Date();
@@ -383,7 +380,9 @@ bot.action("zod_change", async ctx => {
 
 bot.action("butt_cancell", async ctx => {
     choosenTime = "";
-    scheduleTask.stop();
+    await scheduleTask.stop();
+    scheduleTask = 0;
+    console.log(scheduleTask);
     await ctx.editMessageText("Ежедневный прогноз был отменён, чтобы снова его запустить, выберите соответствующий пункт меню.", ctx.callbackQuery.message.message_id);
 })
 
