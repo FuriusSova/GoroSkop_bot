@@ -4,10 +4,12 @@ const bot = new Telegraf(process.env.BOT_TOKEN)
 
 const vars = require("./variables");
 
+const sequelize = require("./db");
+const User = require("./db/user")
+
 const utils = require("util")
 const { default: axios } = require("axios");
 const chr = require("cheerio");
-const { DESTRUCTION } = require('dns');
 const cron = require("node-cron");
 
 //Local variables
@@ -18,6 +20,7 @@ let zodInd;
 let isChoosen = false;
 let choosenTime;
 let scheduleTask;
+let chatId;
 
 //User variables
 
@@ -30,8 +33,9 @@ let userSign;
 
 const scheduledPrediction = async (ctx) => {
     try {
-        scheduleTask = cron.schedule(`${choosenTime[1]} ${choosenTime[0]} * * *`, async () => {
-            await startEveryDayPred(userSign, ctx);
+        const createdUser = await User.findOne({ chat_id: chatId });
+        scheduleTask = cron.schedule(`${createdUser.time_min} ${createdUser.time_hour} * * *`, async () => {
+            await startEveryDayPred(createdUser.sign, ctx);
         }, {
             scheduled: true,
             timezone: "Europe/Kiev"
@@ -54,7 +58,7 @@ const scheduledPrediction = async (ctx) => {
             await resetAtMidnight(ctx);
         }, msToMidnight);
         */
-    } 
+    }
     catch (e) {
         console.log(e);
     };
@@ -63,7 +67,7 @@ const scheduledPrediction = async (ctx) => {
 const startEveryDayPred = async (name, ctx) => {
     $ = await getHTML("https://orakul.com/");
     $(".goro-all-signs a span[class=name]").each(async function (i, elem) {
-        if ($(this).text() == name){
+        if ($(this).text() == name) {
             $ = await getHTML($(this).closest("a").attr("href"));
             prediction = $(".horoBlock p[class]").text();
             await replyFunction(ctx, name);
@@ -78,19 +82,47 @@ const replyFunction = async (ctx, name) => {
 //Repeated prediction
 
 const setSign = async (ctx) => {
-    if(user_zod.includes("repeated")){
-        for(let i = 1; i <= 12; i++){
-            if(user_zod == `zod_repeated_${i}`) {
+    const user = await User.findOne({ chat_id: chatId });
+    if (!user) {
+        const newUser = await User.create({
+            chat_id: chatId
+        })
+    }
+    if (user_zod.includes("repeated")) {
+        await User.update({
+            time_hour: choosenTime[0],
+            time_min: choosenTime[1]
+        }, {
+            where: {
+                chat_id: chatId
+            }
+        });
+        for (let i = 1; i <= 12; i++) {
+            if (user_zod == `zod_repeated_${i}`) {
                 userSign = vars.zodiaks[i];
+                await User.update({
+                    sign: userSign
+                }, {
+                    where: {
+                        chat_id: chatId
+                    }
+                });
                 await ctx.replyWithHTML(`Ваш знак зодиака : <b>${vars.zodiaks[i]}</b>`)
                 await ctx.reply(utils.format(vars.textForNextPred, choosenTime[0], choosenTime[2]));
                 await scheduledPrediction(ctx);
             }
         }
-    } else if(user_zod.includes("choose")){
-        for(let i = 1; i <= 12; i++){
-            if(user_zod == `zod_choose_${i}`) {
+    } else if (user_zod.includes("choose")) {
+        for (let i = 1; i <= 12; i++) {
+            if (user_zod == `zod_choose_${i}`) {
                 userSign = vars.zodiaks[i];
+                await User.update({
+                    sign: userSign
+                }, {
+                    where: {
+                        chat_id: chatId
+                    }
+                });
                 await ctx.replyWithHTML(`Ваш знак зодиака : <b>${vars.zodiaks[i]}</b>`, Markup.inlineKeyboard(
                     [
                         [Markup.button.callback("Изменить знак зодиака", "zod_change")]
@@ -115,7 +147,7 @@ const changeZod = async (ctx) => {
     await ctx.answerCbQuery();
 };
 
-const createButtons = async (ctx) =>{
+const createButtons = async (ctx) => {
     await ctx.reply("На какое время хотите узнать прогноз?", Markup.inlineKeyboard(
         [
             [Markup.button.callback("На вчера", "time_yest"), Markup.button.callback("На сегодня", "time_tod")],
@@ -154,13 +186,15 @@ const createPrediction = async (ctx, date) => {
 }
 
 const reactOnMessage = async (ctx) => {
-    if(isChoosen) {
-        if(vars.pattern.test(ctx.message.text)){
-            if(+ctx.message.text.slice(0, 2) <= 23 && +ctx.message.text.slice(3) <= 59){
+    if (isChoosen) {
+        if (vars.pattern.test(ctx.message.text)) {
+            if (+ctx.message.text.slice(0, 2) <= 23 && +ctx.message.text.slice(3) <= 59) {
                 choosenTime = [+ctx.message.text.slice(0, 2), +ctx.message.text.slice(3), ctx.message.text.slice(3)];
                 isChoosen = false;
 
-                if(!userSign) {
+                const createdUser = await User.findOne({ chat_id: chatId });
+
+                if (!createdUser || !createdUser.sign) {
                     await ctx.reply(vars.chooseDaysText, Markup.inlineKeyboard(
                         [
                             [Markup.button.callback("Овен ♈", "zod_repeated_1"), Markup.button.callback("Телец ♉", "zod_repeated_2")],
@@ -173,6 +207,14 @@ const reactOnMessage = async (ctx) => {
                     ))
                 } else {
                     await ctx.reply(utils.format(vars.textForNextPred, choosenTime[0], choosenTime[2]));
+                    await User.update({
+                        time_hour: choosenTime[0],
+                        time_min: choosenTime[1]
+                    }, {
+                        where: {
+                            chat_id: chatId
+                        }
+                    });
                     await scheduledPrediction(ctx);
                 }
             } else {
@@ -184,7 +226,7 @@ const reactOnMessage = async (ctx) => {
             isChoosen = false;
         }
     }
-    if(ctx.message.text == "Узнать прогноз"){
+    if (ctx.message.text == "Узнать прогноз") {
         await ctx.reply(vars.chooseText, Markup.inlineKeyboard(
             [
                 [Markup.button.callback("Овен ♈", "zod_1"), Markup.button.callback("Телец ♉", "zod_2")],
@@ -197,8 +239,8 @@ const reactOnMessage = async (ctx) => {
         ))
         await ctx.deleteMessage(ctx.message.message_id)
     };
-    if (ctx.message.text == "Ежедневный прогноз"){
-        if(choosenTime) {
+    if (ctx.message.text == "Ежедневный прогноз") {
+        if (choosenTime) {
             await ctx.reply(`Чтобы отменить ежедневный прогноз, нажмите кнопку "Отмена"`, Markup.inlineKeyboard(
                 [
                     [Markup.button.callback("Отмена", "butt_cancell")]
@@ -213,9 +255,11 @@ const reactOnMessage = async (ctx) => {
         }
         await ctx.deleteMessage(ctx.message.message_id)
     };
-    if(ctx.message.text == "Мой знак зодиака"){
-        if(userSign){
-            await ctx.replyWithHTML(`Ваш знак зодиака: <b>${userSign}</b>`, Markup.inlineKeyboard(
+    if (ctx.message.text == "Мой знак зодиака") {
+        const createdUser = await User.findOne({ chat_id: chatId });
+
+        if (createdUser && createdUser.sign) {
+            await ctx.replyWithHTML(`Ваш знак зодиака: <b>${createdUser.sign}</b>`, Markup.inlineKeyboard(
                 [
                     [Markup.button.callback("Изменить знак зодиака", "zod_change")]
                 ]
@@ -233,7 +277,7 @@ const reactOnMessage = async (ctx) => {
 }
 
 const checkConfirmed = async (ctx, data) => {
-    if(data == "butt_confirm") {
+    if (data == "butt_confirm") {
         ctx.reply(vars.chooseDaysText, Markup.inlineKeyboard(
             [
                 [Markup.button.callback("Овен ♈", "zod_choose_1"), Markup.button.callback("Телец ♉", "zod_choose_2")],
@@ -245,7 +289,7 @@ const checkConfirmed = async (ctx, data) => {
             ]
         ))
         await ctx.answerCbQuery();
-    } else if (data == "butt_back"){
+    } else if (data == "butt_back") {
         await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
     }
 }
@@ -258,54 +302,54 @@ const getHTML = async (url) => {
 };
 
 const checkDay = async (name, ctx, date, msg) => {
-    if(date === "time_tod"){
+    if (date === "time_tod") {
         $(".periodMenu li a").each(async function (i, elem) {
-            if($(this).text() == "На сегодня"){
+            if ($(this).text() == "На сегодня") {
                 $ = await getHTML($(this).attr("href"));
                 prediction = $(".horoBlock p[class]").text();
                 await ctx.replyWithHTML(`<em>Прогноз на сегодня для: <b>${name}</b></em> - ${prediction.trim()}`);
                 await ctx.reply(msg ? msg : vars.textForPred);
             }
         })
-    } else if(date === "time_yest"){
+    } else if (date === "time_yest") {
         $(".periodMenu li a").each(async function (i, elem) {
-            if($(this).text() == "На вчера"){
+            if ($(this).text() == "На вчера") {
                 $ = await getHTML($(this).attr("href"));
                 prediction = $(".horoBlock p[class]").text();
                 await ctx.replyWithHTML(`<em>Прогноз на вчера для: <b>${name}</b></em> - ${prediction.trim()}`);
                 await ctx.reply(msg ? msg : vars.textForPred);
             }
         })
-    } else if(date === "time_tom"){
+    } else if (date === "time_tom") {
         $(".periodMenu li a").each(async function (i, elem) {
-            if($(this).text() == "На завтра"){
+            if ($(this).text() == "На завтра") {
                 $ = await getHTML($(this).attr("href"));
                 prediction = $(".horoBlock p[class]").text();
                 await ctx.replyWithHTML(`<em>Прогноз на завтра для: <b>${name}</b></em> - ${prediction.trim()}`);
                 await ctx.reply(msg ? msg : vars.textForPred);
             }
         })
-    } else if(date === "time_week"){
+    } else if (date === "time_week") {
         $(".periodMenu li a").each(async function (i, elem) {
-            if($(this).text() == "На неделю"){
+            if ($(this).text() == "На неделю") {
                 $ = await getHTML($(this).attr("href"));
                 prediction = $(".horoBlock p[class]").text();
                 await ctx.replyWithHTML(`<em>Прогноз на неделю для: <b>${name}</b></em> - ${prediction.trim()}`);
                 await ctx.reply(msg ? msg : vars.textForPred);
             }
         })
-    } else if(date === "time_month"){
+    } else if (date === "time_month") {
         $(".periodMenu li a").each(async function (i, elem) {
-            if($(this).text() == "На месяц"){
+            if ($(this).text() == "На месяц") {
                 $ = await getHTML($(this).attr("href"));
                 prediction = $(".horoBlock p[class]").text();
                 await ctx.replyWithHTML(`<em>Прогноз на месяц для: <b>${name}</b></em> - ${prediction.trim()}`);
                 await ctx.reply(msg ? msg : vars.textForPred);
             }
         })
-    } else if(date === "time_year"){
+    } else if (date === "time_year") {
         $(".periodMenu li a").each(async function (i, elem) {
-            if($(this).text() == "На год"){
+            if ($(this).text() == "На год") {
                 $ = await getHTML($(this).attr("href"));
                 prediction = $(".horoBlock p[class]").text();
                 await ctx.replyWithHTML(`<em>Прогноз на год для: <b>${name}</b></em> - ${prediction.trim()}`);
@@ -318,7 +362,7 @@ const checkDay = async (name, ctx, date, msg) => {
 const parse = async (name, ctx, date, msg) => {
     $ = await getHTML("https://orakul.com/");
     $(".goro-all-signs a span[class=name]").each(async function (i, elem) {
-        if ($(this).text() == name){
+        if ($(this).text() == name) {
             $ = await getHTML($(this).closest("a").attr("href"));
             await checkDay(name, ctx, date, msg);
         }
@@ -329,12 +373,20 @@ const parse = async (name, ctx, date, msg) => {
 //Functions
 
 bot.start(async (ctx) => {
+    chatId = ctx.chat.id;
     await ctx.reply(utils.format(vars.greetings, ctx.message.from.first_name ? ctx.message.from.first_name : ctx.message.from.username), Markup.keyboard(
         [
             [Markup.button.callback("Узнать прогноз", "butt_pred"), Markup.button.callback("Ежедневный прогноз", "butt_day_pred")],
             [Markup.button.callback("Мой знак зодиака", "butt_profile")]
         ]
-    ).resize())
+    ).resize());
+
+    try {
+        await sequelize.authenticate();
+        await sequelize.sync();
+    } catch (error) {
+        console.log(error);
+    }
 })
 
 bot.on("message", async (ctx) => {
@@ -362,10 +414,10 @@ bot.action(["time_yest", "time_tod", "time_tom", "time_week", "time_month", "tim
 })
 
 bot.action(["chse_yes", "chse_no"], async ctx => {
-    if(ctx.callbackQuery.data == "chse_yes"){
+    if (ctx.callbackQuery.data == "chse_yes") {
         await ctx.editMessageText("На которое время хотите получать прогноз? Напишите боту время в формате: 09:00", ctx.callbackQuery.message.message_id);
         isChoosen = true;
-    } else if (ctx.callbackQuery.data == "chse_no"){
+    } else if (ctx.callbackQuery.data == "chse_no") {
         await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
     }
 })
