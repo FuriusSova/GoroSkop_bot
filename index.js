@@ -19,7 +19,6 @@ let $;
 let zodInd;
 let isChoosen = false;
 let choosenTime;
-let scheduleTask;
 let chatId;
 
 //User variables
@@ -34,13 +33,12 @@ let userSign;
 const scheduledPrediction = async (ctx) => {
     try {
         const createdUser = await User.findOne({ chat_id: chatId });
-        scheduleTask = cron.schedule(`${createdUser.time_min} ${createdUser.time_hour} * * *`, async () => {
+        cron.schedule(`${createdUser.time_min} ${createdUser.time_hour} * * *`, async () => {
             await startEveryDayPred(createdUser.sign, ctx);
         }, {
             scheduled: true,
             timezone: "Europe/Kiev"
         });
-        console.log(scheduleTask);
 
         /* 
         let now = new Date();
@@ -432,9 +430,8 @@ bot.action("zod_change", async ctx => {
 
 bot.action("butt_cancell", async ctx => {
     choosenTime = "";
-    await scheduleTask.stop();
-    scheduleTask = 0;
-    console.log(scheduleTask);
+    const scheduleTask = cron.getTasks()[0];
+    scheduleTask.stop();
     await ctx.editMessageText("Ежедневный прогноз был отменён, чтобы снова его запустить, выберите соответствующий пункт меню.", ctx.callbackQuery.message.message_id);
 })
 
