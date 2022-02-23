@@ -9,7 +9,9 @@ User.init({
     time_hour: DataTypes.INTEGER,
     time_min: DataTypes.INTEGER,
     repeatedPred: { type: DataTypes.BOOLEAN, defaultValue: false },
-    zodiacInd: DataTypes.STRING
+    zodiacInd: DataTypes.STRING,
+    time_hour_str: DataTypes.STRING,
+    time_min_str: DataTypes.STRING
 }, { sequelize, modelName: 'user', timestamps: false });
 
 module.exports = User;

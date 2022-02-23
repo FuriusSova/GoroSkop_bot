@@ -24,7 +24,8 @@ let userSign;
 
 const scheduledPrediction = async (ctx) => {
     try {
-        const createdUser = await User.findOne({where: { chat_id: ctx.chat.id }});
+        const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
+        await ctx.reply(utils.format(vars.textForNextPred, createdUser.time_hour_str, createdUser.time_min_str));
         cron.schedule(`${createdUser.time_min} ${createdUser.time_hour} * * *`, async () => {
             await startEveryDayPred(createdUser.sign, ctx);
         }, {
@@ -73,7 +74,7 @@ const replyFunction = async (ctx, name, prediction) => {
 
 const setSign = async (ctx) => {
     if (user_zod.includes("repeated")) {
-        const createdUser = await User.findOne({where: { chat_id:  ctx.chat.id}});
+        const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
         for (let i = 1; i <= 12; i++) {
             if (user_zod == `zod_repeated_${i}`) {
                 userSign = vars.zodiaks[i];
@@ -85,7 +86,6 @@ const setSign = async (ctx) => {
                     }
                 });
                 await ctx.replyWithHTML(`Ваш знак зодиака : <b>${vars.zodiaks[i]}</b>`)
-                await ctx.reply(utils.format(vars.textForNextPred, createdUser.time_hour, createdUser.time_min));
                 await scheduledPrediction(ctx);
             }
         }
@@ -135,7 +135,7 @@ const createButtons = async (ctx) => {
 }
 
 const createPrediction = async (ctx, date) => {
-    const createdUser = await User.findOne({where: { chat_id: ctx.chat.id }});
+    const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
     if (createdUser.zodiacInd === "zod_1") {
         await parse("Овен", ctx, date);
     } else if (createdUser.zodiacInd === "zod_2") {
@@ -171,14 +171,15 @@ const createPrediction = async (ctx, date) => {
 }
 
 const reactOnMessage = async (ctx) => {
-    const createdUser = await User.findOne({where: { chat_id:  ctx.chat.id}});
-    if (createdUser.repeatedPred) {
+    const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
+    if (createdUser.repeatedPred && !createdUser.time_hour) {
         if (vars.pattern.test(ctx.message.text)) {
             if (+ctx.message.text.slice(0, 2) <= 23 && +ctx.message.text.slice(3) <= 59) {
-                const choosenTime = [+ctx.message.text.slice(0, 2), +ctx.message.text.slice(3), ctx.message.text.slice(3)];
                 await User.update({
-                    time_hour: choosenTime[0],
-                    time_min: choosenTime[1]
+                    time_hour: +ctx.message.text.slice(0, 2),
+                    time_min: +ctx.message.text.slice(3),
+                    time_hour_str: ctx.message.text.slice(0, 2),
+                    time_min_str: ctx.message.text.slice(3)
                 }, {
                     where: {
                         chat_id: ctx.chat.id
@@ -196,21 +197,16 @@ const reactOnMessage = async (ctx) => {
                         ]
                     ))
                 } else {
-                    await ctx.reply(utils.format(vars.textForNextPred, createdUser.time_hour, createdUser.time_min));
-                    await User.update({
-                        time_hour: choosenTime[0],
-                        time_min: choosenTime[1]
-                    }, {
-                        where: {
-                            chat_id: ctx.chat.id
-                        }
-                    });
                     await scheduledPrediction(ctx);
                 }
             } else {
                 await ctx.reply("Неверный формат времени!");
                 await User.update({
-                    repeatedPred: false
+                    repeatedPred: false,
+                    time_hour: null,
+                    time_min: null,
+                    time_hour_str: null,
+                    time_min_str: null
                 }, {
                     where: {
                         chat_id: ctx.chat.id
@@ -220,7 +216,11 @@ const reactOnMessage = async (ctx) => {
         } else {
             await ctx.reply("Неверный формат времени!");
             await User.update({
-                repeatedPred: false
+                repeatedPred: false,
+                time_hour: null,
+                time_min: null,
+                time_hour_str: null,
+                time_min_str: null
             }, {
                 where: {
                     chat_id: ctx.chat.id
@@ -258,7 +258,7 @@ const reactOnMessage = async (ctx) => {
         await ctx.deleteMessage(ctx.message.message_id)
     };
     if (ctx.message.text == "Мой знак зодиака") {
-        const createdUser = await User.findOne({where: { chat_id: ctx.chat.id }});
+        const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
 
         if (createdUser && createdUser.sign) {
             await ctx.replyWithHTML(`Ваш знак зодиака: <b>${createdUser.sign}</b>`, Markup.inlineKeyboard(
@@ -449,7 +449,19 @@ bot.action("zod_change", async ctx => {
 bot.action("butt_cancell", async ctx => {
     const scheduleTask = cron.getTasks()[0];
     scheduleTask.stop();
+    await User.update({
+        repeatedPred: false,
+        time_hour: null,
+        time_min: null,
+        time_hour_str: null,
+        time_min_str: null
+    }, {
+        where: {
+            chat_id: ctx.chat.id
+        }
+    })
     await ctx.editMessageText("Ежедневный прогноз был отменён, чтобы снова его запустить, выберите соответствующий пункт меню.", ctx.callbackQuery.message.message_id);
+    const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
 })
 
 bot.launch()
