@@ -32,23 +32,6 @@ const scheduledPrediction = async (ctx) => {
             scheduled: true,
             timezone: "Europe/Kiev"
         });
-
-        /* 
-        let now = new Date();
-        let nextDay = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate() + 1, // the next day, ...
-            choosenTime[0], choosenTime[1], 0, 0 // ...at 12:00:00 hours
-        );
-        
-        let msToMidnight = nextDay.getTime() - now.getTime();
-
-        repeatedPrediction = setTimeout(async function() {
-            await startEveryDayPred(userSign, ctx);
-            await resetAtMidnight(ctx);
-        }, msToMidnight);
-        */
     }
     catch (e) {
         console.log(e);
