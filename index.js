@@ -29,12 +29,12 @@ const scheduledPrediction = async (ctx) => {
         const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
         await ctx.reply(utils.format(vars.textForNextPred, createdUser.time_hour_str, createdUser.time_min_str));
 
-        const task = schedule.scheduleJob(`${createdUser.time_min} ${createdUser.time_hour} * * *`, async () => {
+        schedule.scheduleJob(`${createdUser.time_min} ${createdUser.time_hour} * * *`, async () => {
             await startEveryDayPred(createdUser.sign, ctx);
         });
 
         await User.update({
-            schduledTaskName: task.name
+            schduledTaskName: (Object.keys(schedule.scheduledJobs).pop())
         }, {
             where: {
                 chat_id: ctx.chat.id
