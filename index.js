@@ -219,6 +219,7 @@ const checkConfirmed = async (ctx, data) => {
                 [Markup.button.callback("Водолей ♒", "zod_choose_11"), Markup.button.callback("Рыбы ♓", "zod_choose_12")]
             ]
         ))
+        await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
         await ctx.answerCbQuery();
     } else if (data == "butt_back") {
         await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
