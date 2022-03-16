@@ -10,7 +10,9 @@ const User = require("./db/user")
 const utils = require("util")
 const { default: axios } = require("axios");
 const chr = require("cheerio");
-const cron = require("node-cron");
+
+const schedule = require('node-schedule');
+
 let $;
 
 //User variables
@@ -26,29 +28,18 @@ const scheduledPrediction = async (ctx) => {
     try {
         const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
         await ctx.reply(utils.format(vars.textForNextPred, createdUser.time_hour_str, createdUser.time_min_str));
-        cron.schedule(`${createdUser.time_min} ${createdUser.time_hour} * * *`, async () => {
+
+        const task = schedule.scheduleJob(`${createdUser.time_min} ${createdUser.time_hour} * * *`, async () => {
             await startEveryDayPred(createdUser.sign, ctx);
-        }, {
-            scheduled: true,
-            timezone: "Europe/Kiev"
         });
 
-        /* 
-        let now = new Date();
-        let nextDay = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate() + 1, // the next day, ...
-            choosenTime[0], choosenTime[1], 0, 0 // ...at 12:00:00 hours
-        );
-        
-        let msToMidnight = nextDay.getTime() - now.getTime();
-
-        repeatedPrediction = setTimeout(async function() {
-            await startEveryDayPred(userSign, ctx);
-            await resetAtMidnight(ctx);
-        }, msToMidnight);
-        */
+        await User.update({
+            schduledTaskName: task.name
+        }, {
+            where: {
+                chat_id: ctx.chat.id
+            }
+        });
     }
     catch (e) {
         console.log(e);
@@ -447,8 +438,8 @@ bot.action("zod_change", async ctx => {
 })
 
 bot.action("butt_cancell", async ctx => {
-    const scheduleTask = cron.getTasks()[0];
-    scheduleTask.stop();
+    const user = await User.findOne({ where: { chat_id: ctx.chat.id } });
+    schedule.scheduledJobs[user.schduledTaskName].cancel();
     await User.update({
         repeatedPred: false,
         time_hour: null,

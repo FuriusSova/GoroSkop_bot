@@ -11,7 +11,8 @@ User.init({
     repeatedPred: { type: DataTypes.BOOLEAN, defaultValue: false },
     zodiacInd: DataTypes.STRING,
     time_hour_str: DataTypes.STRING,
-    time_min_str: DataTypes.STRING
+    time_min_str: DataTypes.STRING,
+    schduledTaskName: DataTypes.STRING
 }, { sequelize, modelName: 'user', timestamps: false });
 
 module.exports = User;
