@@ -10,9 +10,7 @@ const User = require("./db/user")
 const utils = require("util")
 const { default: axios } = require("axios");
 const chr = require("cheerio");
-
-const schedule = require('node-schedule');
-
+const cron = require("node-cron");
 let $;
 
 //User variables
@@ -26,19 +24,11 @@ let userSign;
 
 const scheduledPrediction = async (ctx) => {
     try {
-        const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
-        await ctx.reply(utils.format(vars.textForNextPred, createdUser.time_hour_str, createdUser.time_min_str));
-
-        schedule.scheduleJob(`${createdUser.time_min} ${createdUser.time_hour} * * *`, async () => {
-            await startEveryDayPred(createdUser.sign, ctx);
-        });
-
-        await User.update({
-            schduledTaskName: (Object.keys(schedule.scheduledJobs).pop())
+        cron.schedule(`0 12 * * *`, async () => {
+            await startEveryDayPred(ctx);
         }, {
-            where: {
-                chat_id: ctx.chat.id
-            }
+            scheduled: true,
+            timezone: "Europe/Kiev"
         });
     }
     catch (e) {
@@ -46,15 +36,19 @@ const scheduledPrediction = async (ctx) => {
     };
 };
 
-const startEveryDayPred = async (name, ctx) => {
-    $ = await getHTML("https://orakul.com/");
-    $(".goro-all-signs a span[class=name]").each(async function (i, elem) {
-        if ($(this).text() == name) {
-            $ = await getHTML($(this).closest("a").attr("href"));
-            let prediction = $(".horoBlock p[class]").text();
-            await replyFunction(ctx, name, prediction);
-        }
-    });
+const startEveryDayPred = async (ctx) => {
+    const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
+    if (createdUser.repeatedPred) {
+        const name = createdUser.sign;
+        $ = await getHTML("https://orakul.com/");
+        $(".goro-all-signs a span[class=name]").each(async function (i, elem) {
+            if ($(this).text() == name) {
+                $ = await getHTML($(this).closest("a").attr("href"));
+                let prediction = $(".horoBlock p[class]").text();
+                await replyFunction(ctx, name, prediction);
+            }
+        });
+    }
 }
 
 const replyFunction = async (ctx, name, prediction) => {
@@ -77,7 +71,6 @@ const setSign = async (ctx) => {
                     }
                 });
                 await ctx.replyWithHTML(`Ваш знак зодиака : <b>${vars.zodiaks[i]}</b>`)
-                await scheduledPrediction(ctx);
             }
         }
     } else if (user_zod.includes("choose")) {
@@ -163,62 +156,6 @@ const createPrediction = async (ctx, date) => {
 
 const reactOnMessage = async (ctx) => {
     const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
-    if (createdUser.repeatedPred && !createdUser.time_hour) {
-        if (vars.pattern.test(ctx.message.text)) {
-            if (+ctx.message.text.slice(0, 2) <= 23 && +ctx.message.text.slice(3) <= 59) {
-                await User.update({
-                    time_hour: +ctx.message.text.slice(0, 2),
-                    time_min: +ctx.message.text.slice(3),
-                    time_hour_str: ctx.message.text.slice(0, 2),
-                    time_min_str: ctx.message.text.slice(3)
-                }, {
-                    where: {
-                        chat_id: ctx.chat.id
-                    }
-                });
-                if (!createdUser || !createdUser.sign) {
-                    await ctx.reply(vars.chooseDaysText, Markup.inlineKeyboard(
-                        [
-                            [Markup.button.callback("Овен ♈", "zod_repeated_1"), Markup.button.callback("Телец ♉", "zod_repeated_2")],
-                            [Markup.button.callback("Близнецы ♊", "zod_repeated_3"), Markup.button.callback("Рак ♋", "zod_repeated_4")],
-                            [Markup.button.callback("Лев ♌", "zod_repeated_5"), Markup.button.callback("Дева ♍", "zod_repeated_6")],
-                            [Markup.button.callback("Весы ♎", "zod_repeated_7"), Markup.button.callback("Скорпион ♏", "zod_repeated_8")],
-                            [Markup.button.callback("Стрелец ♐", "zod_repeated_9"), Markup.button.callback("Козерог ♑", "zod_repeated_10")],
-                            [Markup.button.callback("Водолей ♒", "zod_repeated_11"), Markup.button.callback("Рыбы ♓", "zod_repeated_12")]
-                        ]
-                    ))
-                } else {
-                    await scheduledPrediction(ctx);
-                }
-            } else {
-                await ctx.reply("Неверный формат времени!");
-                await User.update({
-                    repeatedPred: false,
-                    time_hour: null,
-                    time_min: null,
-                    time_hour_str: null,
-                    time_min_str: null
-                }, {
-                    where: {
-                        chat_id: ctx.chat.id
-                    }
-                })
-            }
-        } else {
-            await ctx.reply("Неверный формат времени!");
-            await User.update({
-                repeatedPred: false,
-                time_hour: null,
-                time_min: null,
-                time_hour_str: null,
-                time_min_str: null
-            }, {
-                where: {
-                    chat_id: ctx.chat.id
-                }
-            })
-        }
-    }
     if (ctx.message.text == "Узнать прогноз") {
         await ctx.reply(vars.chooseText, Markup.inlineKeyboard(
             [
@@ -373,14 +310,19 @@ bot.start(async (ctx) => {
         ]
     ).resize());
 
-    try {
-        await sequelize.authenticate();
-        await sequelize.sync();
-        const newUser = await User.create({
-            chat_id: ctx.chat.id
-        })
-    } catch (error) {
-        console.log(error);
+    const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
+    if (!createdUser) {
+        try {
+            await sequelize.authenticate();
+            await sequelize.sync();
+            const newUser = await User.create({
+                chat_id: ctx.chat.id
+            })
+        } catch (error) {
+            console.log(error);
+        }
+
+        await scheduledPrediction(ctx);
     }
 })
 
@@ -403,6 +345,8 @@ bot.action(["zod_1", "zod_2", "zod_3", "zod_4", "zod_5", "zod_6", "zod_7", "zod_
 })
 
 bot.action(["zod_repeated_1", "zod_repeated_2", "zod_repeated_3", "zod_repeated_4", "zod_repeated_5", "zod_repeated_6", "zod_repeated_7", "zod_repeated_8", "zod_repeated_9", "zod_repeated_10", "zod_repeated_11", "zod_repeated_12", "zod_choose_1", "zod_choose_2", "zod_choose_3", "zod_choose_4", "zod_choose_5", "zod_choose_6", "zod_choose_7", "zod_choose_8", "zod_choose_9", "zod_choose_10", "zod_choose_11", "zod_choose_12"], async ctx => {
+    await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
+    await ctx.reply("Теперь Вы будете получать предсказание для Вашего зодиака каждый день (включительно сегодняшний) в 12:00");
     user_zod = ctx.callbackQuery.data;
     await setSign(ctx);
     await ctx.answerCbQuery();
@@ -423,9 +367,24 @@ bot.action(["chse_yes", "chse_no"], async ctx => {
                 chat_id: ctx.chat.id
             }
         })
-        await ctx.editMessageText("На которое время хотите получать прогноз? Напишите боту время в формате: 09:00", ctx.callbackQuery.message.message_id);
+        const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
+
+        await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
+        if (!createdUser.sign) {
+            await ctx.reply(vars.chooseDaysText, Markup.inlineKeyboard(
+                [
+                    [Markup.button.callback("Овен ♈", "zod_repeated_1"), Markup.button.callback("Телец ♉", "zod_repeated_2")],
+                    [Markup.button.callback("Близнецы ♊", "zod_repeated_3"), Markup.button.callback("Рак ♋", "zod_repeated_4")],
+                    [Markup.button.callback("Лев ♌", "zod_repeated_5"), Markup.button.callback("Дева ♍", "zod_repeated_6")],
+                    [Markup.button.callback("Весы ♎", "zod_repeated_7"), Markup.button.callback("Скорпион ♏", "zod_repeated_8")],
+                    [Markup.button.callback("Стрелец ♐", "zod_repeated_9"), Markup.button.callback("Козерог ♑", "zod_repeated_10")],
+                    [Markup.button.callback("Водолей ♒", "zod_repeated_11"), Markup.button.callback("Рыбы ♓", "zod_repeated_12")]
+                ]
+            ))
+        }
     } else if (ctx.callbackQuery.data == "chse_no") {
         await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
+        await ctx.reply("Теперь Вы будете получать предсказание для Вашего зодиака каждый день (включительно сегодняшний) в 12:00");
     }
 })
 
@@ -438,14 +397,8 @@ bot.action("zod_change", async ctx => {
 })
 
 bot.action("butt_cancell", async ctx => {
-    const user = await User.findOne({ where: { chat_id: ctx.chat.id } });
-    schedule.scheduledJobs[user.schduledTaskName].cancel();
     await User.update({
-        repeatedPred: false,
-        time_hour: null,
-        time_min: null,
-        time_hour_str: null,
-        time_min_str: null
+        repeatedPred: false
     }, {
         where: {
             chat_id: ctx.chat.id
