@@ -310,20 +310,20 @@ bot.start(async (ctx) => {
         ]
     ).resize());
 
-    const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
-    if (!createdUser) {
-        try {
-            await sequelize.authenticate();
-            await sequelize.sync();
+    try {
+        await sequelize.authenticate();
+        await sequelize.sync();
+        const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
+        if (!createdUser) {
             const newUser = await User.create({
                 chat_id: ctx.chat.id
             })
-        } catch (error) {
-            console.log(error);
         }
-
-        await scheduledPrediction(ctx);
+    } catch (error) {
+        console.log(error);
     }
+
+    await scheduledPrediction(ctx);
 })
 
 bot.on("message", async (ctx) => {
@@ -381,6 +381,8 @@ bot.action(["chse_yes", "chse_no"], async ctx => {
                     [Markup.button.callback("Водолей ♒", "zod_repeated_11"), Markup.button.callback("Рыбы ♓", "zod_repeated_12")]
                 ]
             ))
+        } else {
+            await ctx.reply("Теперь Вы будете получать предсказание для Вашего зодиака каждый день (включительно сегодняшний) в 12:00");
         }
     } else if (ctx.callbackQuery.data == "chse_no") {
         await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
