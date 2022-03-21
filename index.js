@@ -38,6 +38,7 @@ const scheduledPrediction = async (ctx) => {
 
 const startEveryDayPred = async (ctx) => {
     const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
+    await ctx.reply("Прогноз на 12:00");
     if (createdUser.repeatedPred) {
         const name = createdUser.sign;
         $ = await getHTML("https://orakul.com/");
