@@ -65,7 +65,7 @@ const replyFunction = async (ctx, name, prediction) => {
 
 const setSign = async (ctx) => {
     if (user_zod.includes("repeated")) {
-        await ctx.reply("Теперь Вы будете получать предсказание для Вашего зодиака каждый день (включительно сегодняшний) в 12:00");
+        await ctx.reply("Теперь Вы получате предсказание для Вашего зодиака завтра в 12:00");
         const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
         for (let i = 1; i <= 12; i++) {
             if (user_zod == `zod_repeated_${i}`) {
@@ -399,7 +399,6 @@ bot.action(["chse_yes", "chse_no"], async ctx => {
         }
     } else if (ctx.callbackQuery.data == "chse_no") {
         await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
-        await ctx.reply("Теперь Вы будете получать предсказание для Вашего зодиака каждый день (включительно сегодняшний) в 12:00");
     }
 })
 
