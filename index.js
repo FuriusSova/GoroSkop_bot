@@ -48,6 +48,11 @@ const startEveryDayPred = async (ctx) => {
                 await replyFunction(ctx, name, prediction);
             }
         });
+        const task = cron.getTasks()[0];
+        task.stop();
+        await User.update({
+            repeatedPred: false
+        }, { where: { chat_id: ctx.chat.id } })
     }
 }
 
@@ -170,9 +175,9 @@ const reactOnMessage = async (ctx) => {
         ))
         await ctx.deleteMessage(ctx.message.message_id)
     };
-    if (ctx.message.text == "Ежедневный прогноз") {
+    if (ctx.message.text == "Автоматический прогноз") {
         if (createdUser.repeatedPred) {
-            await ctx.reply(`Чтобы отменить ежедневный прогноз, нажмите кнопку "Отмена"`, Markup.inlineKeyboard(
+            await ctx.reply(`Чтобы отменить автоматический прогноз, нажмите кнопку "Отмена"`, Markup.inlineKeyboard(
                 [
                     [Markup.button.callback("Отмена", "butt_cancell")]
                 ]
@@ -307,7 +312,7 @@ const parse = async (name, ctx, date, msg) => {
 bot.start(async (ctx) => {
     await ctx.reply(utils.format(vars.greetings, ctx.message.from.first_name ? ctx.message.from.first_name : ctx.message.from.username), Markup.keyboard(
         [
-            [Markup.button.callback("Узнать прогноз", "butt_pred"), Markup.button.callback("Ежедневный прогноз", "butt_day_pred")],
+            [Markup.button.callback("Узнать прогноз", "butt_pred"), Markup.button.callback("Автоматический прогноз", "butt_day_pred")],
             [Markup.button.callback("Мой знак зодиака", "butt_profile")]
         ]
     ).resize());
@@ -328,11 +333,15 @@ bot.start(async (ctx) => {
     await scheduledPrediction(ctx);
 })
 
+bot.help((ctx) => ctx.reply(vars.commands))
+
+bot.command('contact', (ctx) => {
+    ctx.reply("Контакт разработчика: @Furius16");
+})
+
 bot.on("message", async (ctx) => {
     reactOnMessage(ctx);
 })
-
-bot.help((ctx) => ctx.reply(vars.commands))
 
 bot.action(["zod_1", "zod_2", "zod_3", "zod_4", "zod_5", "zod_6", "zod_7", "zod_8", "zod_9", "zod_10", "zod_11", "zod_12"], async ctx => {
     await User.update({
@@ -361,6 +370,8 @@ bot.action(["time_yest", "time_tod", "time_tom", "time_week", "time_month", "tim
 
 bot.action(["chse_yes", "chse_no"], async ctx => {
     if (ctx.callbackQuery.data == "chse_yes") {
+        const task = cron.getTasks()[0];
+        task.start();
         await User.update({
             repeatedPred: true
         }, {
@@ -383,7 +394,7 @@ bot.action(["chse_yes", "chse_no"], async ctx => {
                 ]
             ))
         } else {
-            await ctx.reply("Теперь Вы будете получать предсказание для Вашего зодиака каждый день (включительно сегодняшний) в 12:00");
+            await ctx.reply("Теперь Вы получате предсказание для Вашего зодиака завтра в 12:00");
         }
     } else if (ctx.callbackQuery.data == "chse_no") {
         await ctx.deleteMessage(ctx.callbackQuery.message.message_id);
@@ -400,14 +411,12 @@ bot.action("zod_change", async ctx => {
 })
 
 bot.action("butt_cancell", async ctx => {
+    const task = cron.getTasks()[0];
+    task.stop();
     await User.update({
         repeatedPred: false
-    }, {
-        where: {
-            chat_id: ctx.chat.id
-        }
-    })
-    await ctx.editMessageText("Ежедневный прогноз был отменён, чтобы снова его запустить, выберите соответствующий пункт меню.", ctx.callbackQuery.message.message_id);
+    }, { where: { chat_id: ctx.chat.id } })
+    await ctx.editMessageText("Автоматический прогноз был отменён, чтобы снова его запустить, выберите соответствующий пункт меню.", ctx.callbackQuery.message.message_id);
     const createdUser = await User.findOne({ where: { chat_id: ctx.chat.id } });
 })
 

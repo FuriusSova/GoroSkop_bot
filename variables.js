@@ -1,12 +1,12 @@
 const commands = `
 /start - Узнать прогноз
 /help - Помощь
+/contact - Связаться с разработчиком
 `;
 const greetings = "Здравствуйте, %s! Выберите в меню нужный раздел.";
 const chooseText = "На какой знак зодиака желаете узнать предсказание?";
 const chooseDaysText = "Выберете свой знак зодиака!";
-const timePattern = /\d{2}:\d{2}/;
-const daysPredText = "Вы хотите получать прогноз на Ваш знак зодиака каждый день?";
+const daysPredText = "Вы хотите получить прогноз на Ваш знак зодиака завтра в 12 часов дня?";
 const textForPred = `Желаете узнать еще прогноз? Нажмите на кнопку "Узнать прогноз"`;
 const zodiaks = {
     1 : "Овен",
@@ -30,6 +30,5 @@ module.exports = {
     daysPredText : daysPredText,
     chooseDaysText : chooseDaysText,
     zodiaks : zodiaks,
-    pattern : timePattern,
     textForPred : textForPred
 };
